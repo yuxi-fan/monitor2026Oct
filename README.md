@@ -1,6 +1,6 @@
 # Apple pickup monitor: current report mode
 
-The scheduled workflow now emails **every store's current status on every successful check**, even if all stores are unavailable. It does not read or write stock history and needs **no STATE_TOKEN**. Repeated reports are intentional; at ten-minute intervals this requests about 144 emails per day. Check your Resend daily/monthly quota before leaving it running.
+The scheduled workflow now emails **every store's current status on every successful check**, even if all stores are unavailable. It does not read or write stock history and needs **no STATE_TOKEN**. Repeated reports are intentional; at 15-minute intervals this requests about 96 emails per day. Manual tests, extra runs, and other apps using the same Resend account also count toward your quota. Check your Resend daily/monthly quota before leaving it running.
 
 Product, Apple API, SKU MK1H4LL/A, ZIP 92602, and priority-store ordering are unchanged. Failed Apple requests send no inventory report; unknown fields are labeled unknown rather than unavailable. Dry-run never sends email.
 
@@ -11,7 +11,7 @@ Product, Apple API, SKU MK1H4LL/A, ZIP 92602, and priority-store ordering are un
 3. Start a **new run**. Do not use Re-run jobs on an older failed run: that reruns the older code.
 4. Look for **Inventory report accepted; no history read or written**, then check your inbox.
 
-The existing ten-minute schedule remains configured. GitHub may delay runs. Your computer can be off. To pause: Actions > Apple pickup monitor > ... > Disable workflow. Enable workflow to resume. You may delete the old STATE_TOKEN repository secret and revoke its token if it was created only for this monitor.
+The existing 15-minute schedule remains configured. GitHub may delay runs. Your computer can be off. To pause: Actions > Apple pickup monitor > ... > Disable workflow. Enable workflow to resume. You may delete the old STATE_TOKEN repository secret and revoke its token if it was created only for this monitor.
 
 Required GitHub secrets: **RESEND_API_KEY**, **ALERT_EMAIL**. Required Actions variable (or same-named secret): **RESEND_FROM_EMAIL**. Use your verified Resend sender domain; onboarding@resend.dev can send only to your Resend account email. The separate test_email option still sends a delivery test without querying Apple. All dry-run combinations send nothing.
 
@@ -110,9 +110,9 @@ The test intentionally sends even when stock is unavailable. Regular inventory a
 3. Repeat after a reasonable interval. Unchanged available stock should not send another alert. An observed unavailable-to-available change should send again. Test-email runs never affect this history.
 4. After several expected intervals, inspect Actions for successful runs with event **schedule**. Unchanged stock causes no commit, so check run history, not just state commit timestamps.
 
-The workflow requests a run every ten minutes (UTC minutes 7, 17, 27, 37, 47, 57). **GitHub schedules can be delayed or dropped under load and are not guaranteed to execute exactly every ten minutes.** Scheduled runs use the default branch, which must contain the workflow. Once configured, your Windows computer can be off.
+The workflow requests a run every 15 minutes (UTC minutes 7, 22, 37, 52). **GitHub schedules can be delayed or dropped under load and are not guaranteed to execute exactly every 15 minutes.** Scheduled runs use the default branch, which must contain the workflow. Once configured, your Windows computer can be off.
 
-Concurrency serializes manual and scheduled jobs without canceling an active run; an older pending run may be replaced. A job has a five-minute timeout, Python 3.11, pip caching, and read-only default permissions. Tests run before monitoring or sending a test email. Review Actions billing/runner quota for this private repository: about 144 scheduled jobs are requested per day. Enable GitHub workflow-failure notifications and periodically check run history.
+Concurrency serializes manual and scheduled jobs without canceling an active run; an older pending run may be replaced. A job has a five-minute timeout, Python 3.11, pip caching, and read-only default permissions. Tests run before monitoring or sending a test email. Review Actions billing/runner quota for this private repository: about 96 scheduled jobs are requested per day. Enable GitHub workflow-failure notifications and periodically check run history.
 
 ## Local email test and CLI
 
@@ -172,6 +172,6 @@ References: [GitHub scheduled workflows](https://docs.github.com/en/actions/refe
 
 To pause later, open repository **Actions > Apple pickup monitor**, open the **...** menu, and choose **Disable workflow**. This pauses scheduled runs without deleting code, secrets, or saved stock history. If a run is already active, cancel it separately if you want it stopped immediately.
 
-To resume, select the workflow and choose **Enable workflow**. Its existing ten-minute schedule resumes (subject to GitHub delays). History remains intact, so unchanged available stock does not create another alert merely because monitoring was paused. Changes occurring entirely during a pause cannot be observed.
+To resume, select the workflow and choose **Enable workflow**. Its existing 15-minute schedule resumes (subject to GitHub delays). History remains intact, so unchanged available stock does not create another alert merely because monitoring was paused. Changes occurring entirely during a pause cannot be observed.
 
 If a real run fails at saving state, the log now includes the GitHub HTTP status without credentials or response bodies. Moving state to master does not remove the requirement for a STATE_TOKEN with Contents: Read and write, or bypass branch protection.

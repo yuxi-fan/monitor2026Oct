@@ -1,0 +1,56 @@
+name: Apple pickup monitor
+
+on:
+  schedule:
+    - cron: '7,17,27,37,47,57 * * * *'
+  workflow_dispatch:
+    inputs:
+      test_email:
+        description: 'Send a Resend delivery test only (uncheck dry_run to send)'
+        type: boolean
+        default: false
+      dry_run:
+        description: 'Check without sending email or writing state'
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: apple-pickup-monitor
+  cancel-in-progress: false
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - run: python -m pip install -r requirements.txt
+      - name: Unit tests
+        run: python -m unittest discover -s tests -v
+      - name: Monitor or test email
+        env:
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          RESEND_FROM_EMAIL: ${{ vars.RESEND_FROM_EMAIL || secrets.RESEND_FROM_EMAIL }}
+          ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
+          STATE_TOKEN: ${{ secrets.STATE_TOKEN }}
+          TEST_EMAIL: ${{ inputs.test_email && 'true' || 'false' }}
+          DRY_RUN: ${{ inputs.dry_run && 'true' || 'false' }}
+        shell: bash
+        run: |
+          if [[ "$TEST_EMAIL" == "true" ]]; then
+            args=(--test-email)
+          else
+            args=(--part MK1H4LL/A --zip 92602 --once --state-backend github)
+          fi
+          if [[ "$DRY_RUN" == "true" ]]; then args+=(--dry-run); fi
+          python monitor.py "${args[@]}"
+

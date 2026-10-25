@@ -1,0 +1,12 @@
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.env
+.env.*
+state.json
+state.json.tmp
+stock-state.json
+*.log
+*.pem
+*.key

@@ -35,3 +35,27 @@ class ReportTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 monitor.report_once(monitor.DEFAULT_PART, '92602', session=Mock())
         send.assert_not_called()
+
+
+class MultiProductTests(unittest.TestCase):
+    def test_two_products_one_email(self):
+        current = {'R1': {'name': 'Mission Viejo', 'status': 'available', 'quote': 'Today'}}
+        with patch('monitor.check', return_value=current) as check, patch('monitor.send_email') as send:
+            monitor.report_once(monitor.DEFAULT_PART, '92602', session=Mock(), additional_parts=['MK1L4LL/A'])
+        self.assertEqual([call.args[0] for call in check.call_args_list], ['MK1H4LL/A', 'MK1L4LL/A'])
+        send.assert_called_once()
+        body = send.call_args.args[1]
+        for value in ('MK1H4LL/A', 'MK1L4LL/A', '512GB', '1TB'):
+            self.assertIn(value, body)
+
+    def test_second_product_failure_sends_no_partial_report(self):
+        with patch('monitor.check', side_effect=[{}, ValueError('API failure')]), patch('monitor.send_email') as send:
+            with self.assertRaises(ValueError):
+                monitor.report_once(monitor.DEFAULT_PART, '92602', session=Mock(), additional_parts=['MK1L4LL/A'])
+        send.assert_not_called()
+
+    def test_multi_product_dry_run_checks_both_sends_nothing(self):
+        with patch('monitor.check', return_value={}) as check, patch('monitor.send_email') as send:
+            monitor.report_once(monitor.DEFAULT_PART, '92602', True, session=Mock(), additional_parts=['MK1L4LL/A'])
+        self.assertEqual(check.call_count, 2)
+        send.assert_not_called()

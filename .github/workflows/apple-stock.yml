@@ -48,7 +48,7 @@ jobs:
           if [[ "$TEST_EMAIL" == "true" ]]; then
             args=(--test-email)
           else
-            args=(--part MK1H4LL/A --zip 92602 --once --report)
+            args=(--part MK1H4LL/A --additional-part MK1L4LL/A --zip 92602 --once --report)
           fi
           if [[ "$DRY_RUN" == "true" ]]; then args+=(--dry-run); fi
           python monitor.py "${args[@]}"

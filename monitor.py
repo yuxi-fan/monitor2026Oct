@@ -15,6 +15,7 @@ from notifications import send_email
 API = 'https://www.apple.com/shop/retail/pickup-message'
 DEFAULT_PART = 'MK1H4LL/A'
 PRODUCT = 'iPhone Duo, Black, 512GB, unlocked'
+PRODUCTS = {DEFAULT_PART: PRODUCT, 'MK1L4LL/A': 'iPhone Duo, Night Sky (Black), 1TB, unlocked'}
 PRIORITY = ('irvine spectrum center', 'south coast plaza', 'fashion island', 'mission viejo')
 
 
@@ -77,25 +78,34 @@ def notify(new, part, zipcode):
     send_email(subject, '\n'.join(lines))
 
 
-def report_once(part, zipcode, dry_run=False, *, session):
-    """Email current inventory without reading or writing history."""
-    current = check(part, zipcode, session)
+def report_once(part, zipcode, dry_run=False, *, session, additional_parts=None):
+    """Email all requested products together without reading or writing history."""
+    parts = list(dict.fromkeys([part, *(additional_parts or [])]))
+    snapshots = []
+    for sku in parts:
+        logging.info('Checking product %s', sku)
+        snapshots.append((sku, check(sku, zipcode, session)))
     if dry_run:
         logging.info('DRY RUN: inventory report suppressed; no history accessed')
         return
-    product = PRODUCT if part == DEFAULT_PART else f'Apple part {part}'
-    count = sum(s['status'] == 'available' for s in current.values())
-    lines = [product, f'Part: {part}', f'Search ZIP: {zipcode}',
-             f'{count} of {len(current)} stores available', '', 'Current inventory (priority stores first):']
+    lines = [f'Search ZIP: {zipcode}', 'Current inventory (priority stores first):', '']
+    total_available = total_stores = 0
     def order(store):
         name = store['name'].casefold()
         return next((i for i, p in enumerate(PRIORITY) if p in name), len(PRIORITY)), name
-    for store in sorted(current.values(), key=order):
-        lines.append(f"- {store['name']}: {store['status'] or 'unknown'}. {store['quote']}")
-    lines.extend(['', 'https://www.apple.com/shop/buy-iphone',
+    for sku, current in snapshots:
+        count = sum(s['status'] == 'available' for s in current.values())
+        total_available += count
+        total_stores += len(current)
+        lines.extend([PRODUCTS.get(sku, f'Apple part {sku}'), f'Part: {sku}',
+                      f'{count} of {len(current)} stores available'])
+        for store in sorted(current.values(), key=order):
+            lines.append(f"- {store['name']}: {store['status'] or 'unknown'}. {store['quote']}")
+        lines.append('')
+    lines.extend(['https://www.apple.com/shop/buy-iphone',
                   'Snapshot only; nothing is purchased or reserved.'])
-    send_email(f'Apple pickup report: {count}/{len(current)} stores available', '\n'.join(lines))
-    logging.info('Inventory report accepted; no history read or written')
+    send_email(f'Apple pickup report: {total_available}/{total_stores} product-store checks available', '\n'.join(lines))
+    logging.info('Inventory report accepted for %d products; no history read or written', len(snapshots))
 
 
 def run_once(part, zipcode, dry_run=False, *, session=None, state=None):
@@ -134,6 +144,7 @@ def run_once(part, zipcode, dry_run=False, *, session=None, state=None):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--part', default=os.getenv('APPLE_PART', DEFAULT_PART))
+    parser.add_argument('--additional-part', action='append', default=[], help='Additional SKU in the same report email; repeatable, requires --report')
     parser.add_argument('--zip', default=os.getenv('APPLE_ZIP', '92602'))
     parser.add_argument('--interval', type=int, default=600)
     parser.add_argument('--once', action='store_true')
@@ -143,6 +154,8 @@ def main():
     parser.add_argument('--state-backend', choices=('local', 'github'), default='local')
     parser.add_argument('--state-file', default='state.json')
     args = parser.parse_args()
+    if args.additional_part and not args.report:
+        parser.error('--additional-part requires --report')
     if args.interval < 300:
         parser.error('Minimum interval is 300 seconds')
     if args.test_email:
@@ -158,7 +171,7 @@ def main():
         try:
             with make_session() as session:
                 if args.report:
-                    report_once(args.part, args.zip, args.dry_run, session=session)
+                    report_once(args.part, args.zip, args.dry_run, session=session, additional_parts=args.additional_part)
                 else:
                     state = GitHubState(os.environ['GITHUB_REPOSITORY'], os.environ['STATE_TOKEN']) if args.state_backend == 'github' else LocalState(args.state_file)
                     run_once(args.part, args.zip, args.dry_run, session=session, state=state)

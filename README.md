@@ -1,3 +1,26 @@
+# Apple pickup monitor: current report mode
+
+The scheduled workflow now emails **every store's current status on every successful check**, even if all stores are unavailable. It does not read or write stock history and needs **no STATE_TOKEN**. Repeated reports are intentional; at ten-minute intervals this requests about 144 emails per day. Check your Resend daily/monthly quota before leaving it running.
+
+Product, Apple API, SKU MK1H4LL/A, ZIP 92602, and priority-store ordering are unchanged. Failed Apple requests send no inventory report; unknown fields are labeled unknown rather than unavailable. Dry-run never sends email.
+
+## Use it now
+
+1. Open Actions > Apple pickup monitor > Run workflow.
+2. Choose **master**; leave **test_email unchecked** and **dry_run unchecked**.
+3. Start a **new run**. Do not use Re-run jobs on an older failed run: that reruns the older code.
+4. Look for **Inventory report accepted; no history read or written**, then check your inbox.
+
+The existing ten-minute schedule remains configured. GitHub may delay runs. Your computer can be off. To pause: Actions > Apple pickup monitor > ... > Disable workflow. Enable workflow to resume. You may delete the old STATE_TOKEN repository secret and revoke its token if it was created only for this monitor.
+
+Required GitHub secrets: **RESEND_API_KEY**, **ALERT_EMAIL**. Required Actions variable (or same-named secret): **RESEND_FROM_EMAIL**. Use your verified Resend sender domain; onboarding@resend.dev can send only to your Resend account email. The separate test_email option still sends a delivery test without querying Apple. All dry-run combinations send nothing.
+
+Local command: `python monitor.py --part MK1H4LL/A --zip 92602 --once --report`. Add `--dry-run` to log inventory without email. Tests: `python -m unittest discover -s tests -v`.
+
+The older optional history mode remains available through the CLI when **--report is omitted**. The sections below describe that optional mode and original setup; their STATE_TOKEN and deduplication instructions do not apply to the scheduled report workflow.
+
+---
+
 # Apple pickup inventory monitor (Resend)
 
 Existing Python Apple stock monitor, configured for **iPhone Duo, Black, 512GB, unlocked**, exact SKU **MK1H4LL/A**, ZIP **92602**. The product label is supplied by the user; the SKU controls the inventory lookup. All returned stores are checked (12 in the verified response). Alerts put Irvine Spectrum Center, South Coast Plaza, Fashion Island, and Mission Viejo first.

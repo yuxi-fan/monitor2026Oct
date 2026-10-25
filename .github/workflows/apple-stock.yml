@@ -41,7 +41,6 @@ jobs:
           RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
           RESEND_FROM_EMAIL: ${{ vars.RESEND_FROM_EMAIL || secrets.RESEND_FROM_EMAIL }}
           ALERT_EMAIL: ${{ secrets.ALERT_EMAIL }}
-          STATE_TOKEN: ${{ secrets.STATE_TOKEN }}
           TEST_EMAIL: ${{ inputs.test_email && 'true' || 'false' }}
           DRY_RUN: ${{ inputs.dry_run && 'true' || 'false' }}
         shell: bash
@@ -49,7 +48,7 @@ jobs:
           if [[ "$TEST_EMAIL" == "true" ]]; then
             args=(--test-email)
           else
-            args=(--part MK1H4LL/A --zip 92602 --once --state-backend github)
+            args=(--part MK1H4LL/A --zip 92602 --once --report)
           fi
           if [[ "$DRY_RUN" == "true" ]]; then args+=(--dry-run); fi
           python monitor.py "${args[@]}"

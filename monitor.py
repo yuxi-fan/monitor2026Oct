@@ -77,6 +77,27 @@ def notify(new, part, zipcode):
     send_email(subject, '\n'.join(lines))
 
 
+def report_once(part, zipcode, dry_run=False, *, session):
+    """Email current inventory without reading or writing history."""
+    current = check(part, zipcode, session)
+    if dry_run:
+        logging.info('DRY RUN: inventory report suppressed; no history accessed')
+        return
+    product = PRODUCT if part == DEFAULT_PART else f'Apple part {part}'
+    count = sum(s['status'] == 'available' for s in current.values())
+    lines = [product, f'Part: {part}', f'Search ZIP: {zipcode}',
+             f'{count} of {len(current)} stores available', '', 'Current inventory (priority stores first):']
+    def order(store):
+        name = store['name'].casefold()
+        return next((i for i, p in enumerate(PRIORITY) if p in name), len(PRIORITY)), name
+    for store in sorted(current.values(), key=order):
+        lines.append(f"- {store['name']}: {store['status'] or 'unknown'}. {store['quote']}")
+    lines.extend(['', 'https://www.apple.com/shop/buy-iphone',
+                  'Snapshot only; nothing is purchased or reserved.'])
+    send_email(f'Apple pickup report: {count}/{len(current)} stores available', '\n'.join(lines))
+    logging.info('Inventory report accepted; no history read or written')
+
+
 def run_once(part, zipcode, dry_run=False, *, session=None, state=None):
     state = state or LocalState('state.json')
     logging.info('Loading previous stock state')
@@ -117,6 +138,7 @@ def main():
     parser.add_argument('--interval', type=int, default=600)
     parser.add_argument('--once', action='store_true')
     parser.add_argument('--dry-run', action='store_true')
+    parser.add_argument('--report', action='store_true', help='Email every current store status without accessing history')
     parser.add_argument('--test-email', action='store_true', help='Send a delivery test without querying Apple or touching stock state')
     parser.add_argument('--state-backend', choices=('local', 'github'), default='local')
     parser.add_argument('--state-file', default='state.json')
@@ -135,11 +157,14 @@ def main():
     while True:
         try:
             with make_session() as session:
-                state = GitHubState(os.environ['GITHUB_REPOSITORY'], os.environ['STATE_TOKEN']) if args.state_backend == 'github' else LocalState(args.state_file)
-                run_once(args.part, args.zip, args.dry_run, session=session, state=state)
+                if args.report:
+                    report_once(args.part, args.zip, args.dry_run, session=session)
+                else:
+                    state = GitHubState(os.environ['GITHUB_REPOSITORY'], os.environ['STATE_TOKEN']) if args.state_backend == 'github' else LocalState(args.state_file)
+                    run_once(args.part, args.zip, args.dry_run, session=session, state=state)
         except (requests.RequestException, ValueError, KeyError, OSError):
             # Exception strings can contain credentials or email API details.
-            logging.error('Check failed; state not advanced. Check API access, state branch/token, and Resend settings.')
+            logging.error('Check failed. Check Apple API access and Resend settings; history modes also require valid state access.')
             if args.once:
                 return 1
         if args.once:

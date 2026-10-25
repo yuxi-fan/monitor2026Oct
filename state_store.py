@@ -1,6 +1,7 @@
 """Durable GitHub branch state, or atomic local state for CLI use."""
 import base64
 import json
+import logging
 import os
 from pathlib import Path
 
@@ -33,7 +34,7 @@ class LocalState:
 
 
 class GitHubState:
-    def __init__(self, repository, token, branch='monitor-state', session=None):
+    def __init__(self, repository, token, branch='master', session=None):
         if not token:
             raise ValueError('Missing STATE_TOKEN')
         self.base = f'https://api.github.com/repos/{repository}'
@@ -70,4 +71,6 @@ class GitHubState:
         if self.sha:
             payload['sha'] = self.sha
         response = self.request('PUT', '/contents/stock-state.json', json=payload)
+        if response.status_code >= 400:
+            logging.error('GitHub state write HTTP %d; check STATE_TOKEN Contents write access and master branch rules', response.status_code)
         response.raise_for_status()  # SHA comparison rejects conflicting writes (409).

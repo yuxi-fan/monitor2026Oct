@@ -2,7 +2,7 @@
 
 Existing Python Apple stock monitor, configured for **iPhone Duo, Black, 512GB, unlocked**, exact SKU **MK1H4LL/A**, ZIP **92602**. The product label is supplied by the user; the SKU controls the inventory lookup. All returned stores are checked (12 in the verified response). Alerts put Irvine Spectrum Center, South Coast Plaza, Fashion Island, and Mission Viejo first.
 
-Repository: https://github.com/yuxi-fan/monitor2026Oct. Code changes go directly on **master**. `monitor-state` is a durable data branch for deduplication, not a feature/development branch. Do not merge it into master or reset it during normal operation.
+Repository: https://github.com/yuxi-fan/monitor2026Oct. Code changes go directly on **master**. `stock-state.json` on **master** stores durable alert history. Code and stock history use the same branch. State changes create commits on master; do not delete the state file during normal operation.
 
 ## Windows setup
 
@@ -16,7 +16,7 @@ py -3 -m venv .venv
 .\.venv\Scripts\python.exe monitor.py --part MK1H4LL/A --zip 92602 --once --dry-run
 ```
 
-Use your Python executable instead of `py -3` if necessary. No PowerShell activation is required. Dry-run logs inventory but never sends email or writes stock state. Local checks use `state.json` by default; cloud checks use the durable state branch. A failed one-shot check exits nonzero.
+Use your Python executable instead of `py -3` if necessary. No PowerShell activation is required. Dry-run logs inventory but never sends email or writes stock state. Local checks use `state.json` by default; cloud checks use stock-state.json on master. A failed one-shot check exits nonzero.
 
 The working Apple API remains GET `https://www.apple.com/shop/retail/pickup-message` with `pl=true`, `parts.0=MK1H4LL/A`, and `location=92602`. The old endpoint is not used.
 
@@ -60,9 +60,9 @@ The workflow's built-in `GITHUB_TOKEN` stays at **contents: read**. Updating sta
 2. Select resource owner `yuxi-fan`, **Only select repositories**, and `monitor2026Oct`.
 3. Grant **Repository permissions > Contents: Read and write** (Metadata read is automatic). No Workflows/Actions/admin access is needed for this state token.
 4. Set an expiration you will maintain, generate the token, and save it as repository secret `STATE_TOKEN`. Renew before expiration.
-5. On the Code tab verify **monitor-state** exists. If missing, use the branch selector on **master**, type `monitor-state`, and create it from master. Leave master as the default branch. Rules for this data branch must allow the token owner to write it.
+5. Leave **master** as the default branch. Its branch rules must allow the token owner to write stock-state.json directly. No separate state branch is required.
 
-The fine-grained token is repository-scoped, not branch-scoped. This code writes only `stock-state.json` on `monitor-state`; protect the token accordingly. State is read on every cloud run and committed only when known stock status changes. The stock-state file does not contain email credentials. A corrupt file, missing branch, or invalid token fails closed rather than starting with empty history.
+The fine-grained token is repository-scoped, not branch-scoped. This code writes only `stock-state.json` on `master`; protect the token accordingly. State is read on every cloud run and committed only when known stock status changes. The stock-state file does not contain email credentials. A corrupt file, missing branch, or invalid token fails closed rather than starting with empty history.
 
 ### Enable the workflow
 
@@ -83,7 +83,7 @@ The test intentionally sends even when stock is unavailable. Regular inventory a
 ## Test inventory and enable unattended monitoring
 
 1. Run on **master** with **test_email = false**, **dry_run = true**. Confirm the inventory step logs all returned stores (12 expected from the supplied verified response) and no message/state write occurs. This requires state-read access but does not validate state-write access.
-2. Run with **test_email = false**, **dry_run = false**. A store first observed available sends an alert; unavailable stock sends nothing. Confirm `stock-state.json` appears on the data branch after the first successful normal run.
+2. Run with **test_email = false**, **dry_run = false**. A store first observed available sends an alert; unavailable stock sends nothing. Confirm `stock-state.json` appears on master after the first successful normal run.
 3. Repeat after a reasonable interval. Unchanged available stock should not send another alert. An observed unavailable-to-available change should send again. Test-email runs never affect this history.
 4. After several expected intervals, inspect Actions for successful runs with event **schedule**. Unchanged stock causes no commit, so check run history, not just state commit timestamps.
 
@@ -117,7 +117,7 @@ Set `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, and `ALERT_EMAIL` in your process env
 - Resend uses HTTPS POST `/emails`, bearer API-key authentication, configured sender/recipient, and 10/30-second timeouts. Transient network errors and 500/502/503/504 responses get at most two retries, using the same per-send idempotency key and payload. 429 and other errors stop without aggressive retries. Redirects are rejected.
 - Only a successful JSON response with an email ID confirms acceptance. Error logs contain fixed messages and HTTP status codes; raw response bodies, authorization headers, keys, sender, and recipient are never logged. Inspect the Resend dashboard for details.
 - Notification failure leaves previous stock state unchanged, allowing the next normal check to retry. GitHub commits use SHA comparison to reject conflicting writes. Invalid JSON, bad store identity, API errors, or corrupt state fail closed.
-- Resend acceptance and the GitHub commit are separate transactions. If the email is accepted but the state commit fails, a later run may repeat the alert. Per-send idempotency protects in-process retries, not separate scheduled runs; exactly-once delivery across both services is not guaranteed. This preserves the existing durable stock-change deduplication behavior without changing the saved-state format.
+- Resend acceptance and the GitHub commit are separate transactions. If the email is accepted but the state commit fails, a later run may repeat the alert. Per-send idempotency protects in-process retries, not separate scheduled runs; exactly-once delivery across both services is not guaranteed. This preserves the existing durable stock-change deduplication behavior without changing the saved-state format. The workflow has no push trigger, so state commits do not start additional monitoring jobs.
 - This monitor never purchases/reserves anything. Apple's API is undocumented, and stock can disappear before checkout. Code/tests passing does not mean account configuration, actual cloud API access, or inbox delivery has been verified.
 
 ## Troubleshooting
@@ -126,7 +126,7 @@ Set `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, and `ALERT_EMAIL` in your process env
 - **Resend 422**: inspect sender/recipient formatting and the dashboard.
 - **429 or 5xx/network failures**: check quota/service status; failed notifications do not advance stock history.
 - **Test passes but no inbox mail**: inspect Resend Emails for delivered/bounced/rejected/suppressed status, then check spam. Acceptance is not an inbox guarantee.
-- **Inventory check failed**: follow the last logged stage (load state, Apple lookup, send, save); verify state branch/token and Apple access. Failure details omit sensitive payloads.
+- **Inventory check failed**: follow the last logged stage (load state, Apple lookup, send, save); verify master branch rules and STATE_TOKEN and Apple access. Failure details omit sensitive payloads.
 - **No scheduled runs**: confirm master is the default branch, workflow is enabled, runner quota remains, and allow for GitHub scheduling delays.
 - **Repeated Apple 429/541**: pause the workflow if persistent; do not increase frequency or bypass blocking.
 - **Old local state**: the old original pre-cloud monitor used a different JSON format. Rename it and ignore the renamed file before switching; never silently reset valid cloud history.
@@ -144,3 +144,11 @@ git switch master
 For future updates in the existing configured folder, inspect `git status`, stage only intended source files, commit, and `git push origin master`. Do not commit `.venv`, `.env`, credentials, or local state. No feature branch is required. Do not force-push over remote changes.
 
 References: [GitHub scheduled workflows](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule), [GitHub contents API](https://docs.github.com/en/rest/repos/contents#create-or-update-file-contents).
+
+## Pause or resume monitoring
+
+To pause later, open repository **Actions > Apple pickup monitor**, open the **...** menu, and choose **Disable workflow**. This pauses scheduled runs without deleting code, secrets, or saved stock history. If a run is already active, cancel it separately if you want it stopped immediately.
+
+To resume, select the workflow and choose **Enable workflow**. Its existing ten-minute schedule resumes (subject to GitHub delays). History remains intact, so unchanged available stock does not create another alert merely because monitoring was paused. Changes occurring entirely during a pause cannot be observed.
+
+If a real run fails at saving state, the log now includes the GitHub HTTP status without credentials or response bodies. Moving state to master does not remove the requirement for a STATE_TOKEN with Contents: Read and write, or bypass branch protection.

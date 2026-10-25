@@ -205,10 +205,12 @@ class StateTests(unittest.TestCase):
         session.request.side_effect = [response({}), response({'encoding': 'base64', 'sha': 'oldsha', 'content': encoded}), response({})]
         state = GitHubState('owner/repo', 'mock-token', session=session)
         self.assertEqual(state.load(), data)
+        self.assertEqual(session.request.call_args.kwargs['params'], {'ref': 'master'})
+        self.assertTrue(session.request.call_args_list[0].args[1].endswith('/branches/master'))
         state.save(data)
         payload = session.request.call_args.kwargs['json']
         self.assertEqual(payload['sha'], 'oldsha')
-        self.assertEqual(payload['branch'], 'monitor-state')
+        self.assertEqual(payload['branch'], 'master')
         self.assertEqual(json.loads(base64.b64decode(payload['content'])), data)
 
     def test_missing_file_only_after_branch_verified(self):

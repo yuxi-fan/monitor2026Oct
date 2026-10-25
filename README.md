@@ -1,13 +1,16 @@
 # Apple pickup monitor: current report mode
 
-Each scheduled run checks both unlocked US iPhone Duo variants near ZIP 92602:
+Each scheduled run checks all four unlocked US iPhone Duo variants near ZIP 92602:
 
 - Black 512GB: **MK1H4LL/A** (existing configuration).
 - Night Sky (Black) 1TB: **MK1L4LL/A**, verified from Apple's [1TB product page](https://www.apple.com/shop/buy-iphone/iphone-duo/7.6-inch-display-1tb-night-sky-unlocked).
 
-Both products appear in **one combined email** every 15 minutes, preserving the limit of 96 scheduled emails per day. Manual runs/tests and other account usage count toward Resend quotas too. Each SKU is checked once using the same Apple API. If a product's API check fails, the run fails without sending a misleading partial report. There is no saved history in scheduled report mode.
+- Star White 512GB: **MK1G4LL/A**, verified from Apple's 512GB Star White unlocked product page.
+- Star White 1TB: **MK1J4LL/A**, verified from Apple's 1TB Star White unlocked product page.
 
-Local combined dry-run: `python monitor.py --part MK1H4LL/A --additional-part MK1L4LL/A --zip 92602 --once --report --dry-run`. Repeat `--additional-part` to add another SKU to a report; the flag requires `--report`.
+All four products appear in **one combined email** every 15 minutes, preserving the limit of 96 scheduled emails per day. Manual runs/tests and other account usage count toward Resend quotas too. Each SKU is checked once using the same Apple API. If a product's API check fails, the run fails without sending a misleading partial report. There is no saved history in scheduled report mode.
+
+Local combined dry-run: `python monitor.py --part MK1H4LL/A --additional-part MK1L4LL/A --additional-part MK1G4LL/A --additional-part MK1J4LL/A --zip 92602 --once --report --dry-run`. Repeat `--additional-part` to add another SKU to a report; the flag requires `--report`.
 
 The scheduled workflow now emails **every store's current status on every successful check**, even if all stores are unavailable. It does not read or write stock history and needs **no STATE_TOKEN**. Repeated reports are intentional; at 15-minute intervals this requests about 96 emails per day. Manual tests, extra runs, and other apps using the same Resend account also count toward your quota. Check your Resend daily/monthly quota before leaving it running.
 

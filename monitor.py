@@ -15,7 +15,12 @@ from notifications import send_email
 API = 'https://www.apple.com/shop/retail/pickup-message'
 DEFAULT_PART = 'MK1H4LL/A'
 PRODUCT = 'iPhone Duo, Black, 512GB, unlocked'
-PRODUCTS = {DEFAULT_PART: PRODUCT, 'MK1L4LL/A': 'iPhone Duo, Night Sky (Black), 1TB, unlocked'}
+PRODUCTS = {
+    DEFAULT_PART: PRODUCT,
+    'MK1L4LL/A': 'iPhone Duo, Night Sky (Black), 1TB, unlocked',
+    'MK1G4LL/A': 'iPhone Duo, Star White, 512GB, unlocked',
+    'MK1J4LL/A': 'iPhone Duo, Star White, 1TB, unlocked',
+}
 PRIORITY = ('irvine spectrum center', 'south coast plaza', 'fashion island', 'mission viejo')
 
 

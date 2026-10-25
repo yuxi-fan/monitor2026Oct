@@ -59,3 +59,18 @@ class MultiProductTests(unittest.TestCase):
             monitor.report_once(monitor.DEFAULT_PART, '92602', True, session=Mock(), additional_parts=['MK1L4LL/A'])
         self.assertEqual(check.call_count, 2)
         send.assert_not_called()
+
+
+class FourProductTests(unittest.TestCase):
+    def test_four_variants_share_one_email_with_correct_labels(self):
+        current = {'R1': {'name': 'Mission Viejo', 'status': 'unavailable', 'quote': ''}}
+        skus = ['MK1H4LL/A', 'MK1L4LL/A', 'MK1G4LL/A', 'MK1J4LL/A']
+        with patch('monitor.check', return_value=current) as check, patch('monitor.send_email') as send:
+            monitor.report_once(skus[0], '92602', session=Mock(), additional_parts=skus[1:])
+        self.assertEqual([call.args[0] for call in check.call_args_list], skus)
+        send.assert_called_once()
+        body = send.call_args.args[1]
+        for sku in skus:
+            self.assertIn(sku, body)
+        self.assertIn('Star White, 512GB', body)
+        self.assertIn('Star White, 1TB', body)

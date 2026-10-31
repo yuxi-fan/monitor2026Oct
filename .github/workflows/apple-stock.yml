@@ -1,8 +1,7 @@
 name: Apple pickup monitor
 
 on:
-  schedule:
-    - cron: '7,22,37,52 * * * *'
+  # Automatic monitoring stopped at user request; manual runs remain available.
   workflow_dispatch:
     inputs:
       test_email:
